@@ -8,29 +8,70 @@ import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
+import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 
 import java.io.IOException;
+import java.sql.*;
 import java.util.ArrayList;
-import java.util.HashSet;
+import java.util.List;
 
 public class Main {
-    public static void main(String[] args) throws IOException {
-        final ArrayList<String> linkPool = new ArrayList<>();
-        final HashSet<String> processedLink = new HashSet<>();
-        linkPool.add("https://sina.cn");
-        while (!linkPool.isEmpty()) {
+    public static void main(String[] args) throws IOException, SQLException {
+        Connection connection = DriverManager.getConnection("jdbc:h2:file:./target/news", "root", "root");
+        while (true) {
+            List<String> linkPool = loadUrlsFromDatabase(connection);
+            if (linkPool.isEmpty()) {
+                break;
+            }
             String link = linkPool.remove(linkPool.size() - 1);
-            if (processedLink.contains(link)) {
+            operateLinkBySqlIntoDatabase(connection, link, "delete from link_to_be_processed where link = ?");
+            if (isLinkProcessed(connection, link)) {
                 continue;
             }
             if (isInterestingLink(link)) {
                 Document doc = GetNewsPageHtmlAndParse(link);
-                doc.select("a").stream().map(aTag -> aTag.attr("href")).forEach(linkPool::add);
+                selectHrefInPageAndStoreIntoDatabase(connection, doc);
                 storeIntoDatabaseIfItIsNewsPage(doc);
-                processedLink.add(link);
+                operateLinkBySqlIntoDatabase(connection, link, "insert into link_already_processed values (?)");
             }
         }
+    }
+
+    private static void selectHrefInPageAndStoreIntoDatabase(Connection connection, Document doc) throws SQLException {
+        for (Element aTag : doc.select("a")) {
+            String href = aTag.attr("href");
+            operateLinkBySqlIntoDatabase(connection, href, "insert into link_to_be_processed values (?)");
+        }
+    }
+
+    private static boolean isLinkProcessed(Connection connection, String link) throws SQLException {
+        try (PreparedStatement preparedStatement = connection.prepareStatement("select * from link_already_processed where link = ?")) {
+            preparedStatement.setString(1, link);
+            final ResultSet resultSet = preparedStatement.executeQuery();
+            if (resultSet.next()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static void operateLinkBySqlIntoDatabase(Connection connection, String link, String sql) throws SQLException {
+        try (PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
+            preparedStatement.setString(1, link);
+            preparedStatement.executeUpdate();
+        }
+    }
+
+    private static List<String> loadUrlsFromDatabase(Connection connection) throws SQLException {
+        final ArrayList<String> results = new ArrayList<>();
+        try (PreparedStatement preparedStatement = connection.prepareStatement("select * from link_to_be_processed")) {
+            final ResultSet resultSet = preparedStatement.executeQuery();
+            while (resultSet.next()) {
+                results.add(resultSet.getString(1));
+            }
+        }
+        return results;
     }
 
     private static void storeIntoDatabaseIfItIsNewsPage(Document doc) {
@@ -54,11 +95,11 @@ public class Main {
     }
 
     private static boolean isInterestingLink(String link) {
-        return (isNewsPage(link) || isIndexPage(link)) && isNotLoginPage();
+        return (isNewsPage(link) || isIndexPage(link)) && isNotLoginPage(link);
     }
 
-    private static boolean isNotLoginPage() {
-        return !isNewsPage("passport.sina.cn");
+    private static boolean isNotLoginPage(String link) {
+        return link.contains("passport");
     }
 
     private static boolean isIndexPage(String link) {
