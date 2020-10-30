@@ -146,6 +146,16 @@
                     </dependency>
                 </dependencies>
             </plugin>
+            <plugin>
+                <groupId>org.flywaydb</groupId>
+                <artifactId>flyway-maven-plugin</artifactId>
+                <version>7.1.1</version>
+                <configuration>
+                    <url>jdbc:h2:file:./target/news</url>
+                    <user>root</user>
+                    <password>root</password>
+                </configuration>
+            </plugin>
         </plugins>
     </build>
 </project>
