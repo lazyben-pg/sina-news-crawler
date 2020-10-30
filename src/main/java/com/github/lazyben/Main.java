@@ -21,7 +21,9 @@ public class Main {
         Connection connection = DriverManager.getConnection("jdbc:h2:file:./target/news", "root", "root");
         String link;
         while ((link = getALinkFromDatabaseAndDeleteIt(connection)) != null) {
-            if (isLinkProcessed(connection, link)) continue;
+            if (isLinkProcessed(connection, link)) {
+                continue;
+            }
             if (isInterestingLink(link)) {
                 Document doc = GetNewsPageHtmlAndParse(link);
                 selectHrefInPageAndStoreIntoDatabase(connection, doc);
