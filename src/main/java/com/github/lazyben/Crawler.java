@@ -32,7 +32,8 @@ public class Crawler {
                 Document doc = GetNewsPageHtmlAndParse(link);
                 selectHrefInPageAndStoreIntoDatabase(doc);
                 storeIntoDatabaseIfItIsNewsPage(doc, link);
-                dao.operateLinkBySqlIntoDatabase(link, "insert into link_already_processed values (?)");
+                dao.insertLinkAlreadyProcessed(link);
+
             }
         }
     }
@@ -44,7 +45,7 @@ public class Crawler {
                 href = "https:" + href;
             }
             if (!href.toLowerCase().startsWith("javascript")) {
-                dao.operateLinkBySqlIntoDatabase(href, "insert into link_to_be_processed values (?)");
+                dao.insertLinkToBeProcessed(href);
             }
         }
     }
