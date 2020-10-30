@@ -14,6 +14,7 @@ import org.jsoup.select.Elements;
 
 import java.io.IOException;
 import java.sql.*;
+import java.util.stream.Collectors;
 
 public class Main {
     @SuppressFBWarnings("DMI_CONSTANT_DB_PASSWORD")
@@ -45,7 +46,12 @@ public class Main {
     private static void selectHrefInPageAndStoreIntoDatabase(Connection connection, Document doc) throws SQLException {
         for (Element aTag : doc.select("a")) {
             String href = aTag.attr("href");
-            operateLinkBySqlIntoDatabase(connection, href, "insert into link_to_be_processed values (?)");
+            if (href.startsWith("//")) {
+                href = "https:" + href;
+            }
+            if (!href.toLowerCase().startsWith("javascript")) {
+                operateLinkBySqlIntoDatabase(connection, href, "insert into link_to_be_processed values (?)");
+            }
         }
     }
 
@@ -81,19 +87,22 @@ public class Main {
         return null;
     }
 
-    private static void storeIntoDatabaseIfItIsNewsPage(Connection connection, Document doc, String link) {
+    private static void storeIntoDatabaseIfItIsNewsPage(Connection connection, Document doc, String link) throws SQLException {
         Elements articleTags = doc.select("article");
-//        Elements article = doc.select(".art_p");
         if (!articleTags.isEmpty()) {
-            //System.out.println(article);
-            System.out.println(articleTags.get(0).child(0).text());
+            String content = articleTags.select("p").stream().map(Element::text).collect(Collectors.joining("\n"));
+            String title = articleTags.get(0).child(0).text();
+            System.out.println(title);
+            try (PreparedStatement preparedStatement = connection.prepareStatement("insert into news (url, content, title, created_at, modified_at) values (?,?,?,now(),now())")) {
+                preparedStatement.setString(1, link);
+                preparedStatement.setString(2, content);
+                preparedStatement.setString(3, title);
+                preparedStatement.executeUpdate();
+            }
         }
     }
 
     private static Document GetNewsPageHtmlAndParse(String link) throws IOException {
-        if (link.startsWith("//")) {
-            link = "https:" + link;
-        }
         CloseableHttpClient httpclient = HttpClients.createDefault();
         HttpGet httpGet = new HttpGet(link);
         httpGet.setHeader("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.106 Safari/537.36");
