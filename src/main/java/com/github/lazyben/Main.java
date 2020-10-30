@@ -83,7 +83,7 @@ public class Main {
 
     private static void storeIntoDatabaseIfItIsNewsPage(Connection connection, Document doc, String link) {
         Elements articleTags = doc.select("article");
-        Elements article = doc.select(".art_p");
+//        Elements article = doc.select(".art_p");
         if (!articleTags.isEmpty()) {
             //System.out.println(article);
             System.out.println(articleTags.get(0).child(0).text());
