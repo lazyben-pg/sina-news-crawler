@@ -7,9 +7,9 @@ public interface CrawlerDao {
 
     boolean isLinkProcessed(String link) throws SQLException;
 
-    void operateLinkBySqlIntoDatabase(String link, String sql) throws SQLException;
-
-    String getALinkFromDatabase() throws SQLException;
-
     void storeIntoDatabase(String link, String content, String title) throws SQLException;
+
+    void insertLinkToBeProcessed(String link) throws SQLException;
+
+    void insertLinkAlreadyProcessed(String link) throws SQLException;
 }

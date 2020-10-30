@@ -43,7 +43,6 @@ public class JdbcCrawlerDao implements CrawlerDao {
         return false;
     }
 
-    @Override
     public void operateLinkBySqlIntoDatabase(String link, String sql) throws SQLException {
         try (PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
             preparedStatement.setString(1, link);
@@ -51,8 +50,7 @@ public class JdbcCrawlerDao implements CrawlerDao {
         }
     }
 
-    @Override
-    public String getALinkFromDatabase() throws SQLException {
+    private String getALinkFromDatabase() throws SQLException {
         try (PreparedStatement preparedStatement = connection.prepareStatement("select * from link_to_be_processed limit 1"); ResultSet resultSet = preparedStatement.executeQuery()) {
             if (resultSet.next()) {
                 return resultSet.getString(1);
@@ -69,5 +67,15 @@ public class JdbcCrawlerDao implements CrawlerDao {
             preparedStatement.setString(3, title);
             preparedStatement.executeUpdate();
         }
+    }
+
+    @Override
+    public void insertLinkToBeProcessed(String link) throws SQLException {
+        operateLinkBySqlIntoDatabase(link, "insert into link_to_be_processed values (?)");
+    }
+
+    @Override
+    public void insertLinkAlreadyProcessed(String link) throws SQLException {
+        operateLinkBySqlIntoDatabase(link, "insert into link_already_processed values (?)");
     }
 }
