@@ -78,4 +78,4 @@ public class JdbcCrawlerDao implements CrawlerDao {
     public void insertLinkAlreadyProcessed(String link) throws SQLException {
         operateLinkBySqlIntoDatabase(link, "insert into link_already_processed values (?)");
     }
-}
+

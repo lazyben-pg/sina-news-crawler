@@ -33,6 +33,7 @@ public class Crawler {
                 selectHrefInPageAndStoreIntoDatabase(doc);
                 storeIntoDatabaseIfItIsNewsPage(doc, link);
                 dao.insertLinkAlreadyProcessed(link);
+
             }
         }
     }
