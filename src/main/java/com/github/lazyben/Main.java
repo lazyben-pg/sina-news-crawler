@@ -1,5 +1,6 @@
 package com.github.lazyben;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.http.HttpEntity;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
@@ -13,29 +14,30 @@ import org.jsoup.select.Elements;
 
 import java.io.IOException;
 import java.sql.*;
-import java.util.ArrayList;
-import java.util.List;
 
 public class Main {
+    @SuppressFBWarnings("DMI_CONSTANT_DB_PASSWORD")
     public static void main(String[] args) throws IOException, SQLException {
         Connection connection = DriverManager.getConnection("jdbc:h2:file:./target/news", "root", "root");
-        while (true) {
-            List<String> linkPool = loadUrlsFromDatabase(connection);
-            if (linkPool.isEmpty()) {
-                break;
-            }
-            String link = linkPool.remove(linkPool.size() - 1);
-            operateLinkBySqlIntoDatabase(connection, link, "delete from link_to_be_processed where link = ?");
-            if (isLinkProcessed(connection, link)) {
-                continue;
-            }
+        String link;
+        while ((link = getALinkFromDatabaseAndDeleteIt(connection)) != null) {
+            if (isLinkProcessed(connection, link)) continue;
             if (isInterestingLink(link)) {
                 Document doc = GetNewsPageHtmlAndParse(link);
                 selectHrefInPageAndStoreIntoDatabase(connection, doc);
-                storeIntoDatabaseIfItIsNewsPage(doc);
+                storeIntoDatabaseIfItIsNewsPage(connection, doc, link);
                 operateLinkBySqlIntoDatabase(connection, link, "insert into link_already_processed values (?)");
             }
         }
+    }
+
+    private static String getALinkFromDatabaseAndDeleteIt(Connection connection) throws SQLException {
+        String link = getALinkFromDatabase(connection);
+        if (link != null) {
+            operateLinkBySqlIntoDatabase(connection, link, "delete from link_to_be_processed where link = ?");
+            return link;
+        }
+        return null;
     }
 
     private static void selectHrefInPageAndStoreIntoDatabase(Connection connection, Document doc) throws SQLException {
@@ -46,11 +48,16 @@ public class Main {
     }
 
     private static boolean isLinkProcessed(Connection connection, String link) throws SQLException {
+        ResultSet resultSet = null;
         try (PreparedStatement preparedStatement = connection.prepareStatement("select * from link_already_processed where link = ?")) {
             preparedStatement.setString(1, link);
-            final ResultSet resultSet = preparedStatement.executeQuery();
+            resultSet = preparedStatement.executeQuery();
             if (resultSet.next()) {
                 return true;
+            }
+        } finally {
+            if (resultSet != null) {
+                resultSet.close();
             }
         }
         return false;
@@ -63,20 +70,20 @@ public class Main {
         }
     }
 
-    private static List<String> loadUrlsFromDatabase(Connection connection) throws SQLException {
-        final ArrayList<String> results = new ArrayList<>();
-        try (PreparedStatement preparedStatement = connection.prepareStatement("select * from link_to_be_processed")) {
-            final ResultSet resultSet = preparedStatement.executeQuery();
-            while (resultSet.next()) {
-                results.add(resultSet.getString(1));
+    private static String getALinkFromDatabase(Connection connection) throws SQLException {
+        try (PreparedStatement preparedStatement = connection.prepareStatement("select * from link_to_be_processed limit 1"); ResultSet resultSet = preparedStatement.executeQuery()) {
+            if (resultSet.next()) {
+                return resultSet.getString(1);
             }
         }
-        return results;
+        return null;
     }
 
-    private static void storeIntoDatabaseIfItIsNewsPage(Document doc) {
+    private static void storeIntoDatabaseIfItIsNewsPage(Connection connection, Document doc, String link) {
         Elements articleTags = doc.select("article");
+        Elements article = doc.select(".art_p");
         if (!articleTags.isEmpty()) {
+            //System.out.println(article);
             System.out.println(articleTags.get(0).child(0).text());
         }
     }
@@ -99,7 +106,7 @@ public class Main {
     }
 
     private static boolean isNotLoginPage(String link) {
-        return link.contains("passport");
+        return !link.contains("passport");
     }
 
     private static boolean isIndexPage(String link) {
