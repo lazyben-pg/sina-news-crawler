@@ -24,7 +24,7 @@ public class MybatisDao implements CrawlerDao {
     }
 
     @Override
-    public String getALinkFromDatabaseAndDeleteIt() throws SQLException {
+    public synchronized String getALinkFromDatabaseAndDeleteIt() throws SQLException {
         try (SqlSession session = sqlSessionFactory.openSession(true)) {
             String link = session.selectOne("MyMapper.getALinkFromDatabase");
             if (link != null) {
